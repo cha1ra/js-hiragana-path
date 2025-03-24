@@ -14,12 +14,12 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      font-family: Arial, sans-serif;
+      height: 100vh;
     }
     #game-container {
       position: relative;
-      width: 600px;
-      height: 600px;
+      /* width: 600px; */
+      /* height: 600px; */
       border: 1px solid #ccc;
       margin-bottom: 20px;
     }
@@ -154,7 +154,8 @@
     let strokeCompleted = false; // 現在のストロークが完了したか
 
     function setup() {
-      const canvas = createCanvas(600, 600);
+      const size = Math.min(windowWidth, 600);
+      const canvas = createCanvas(size, size);
       canvas.parent('game-container');
       
       // 文字選択のイベントリスナー
