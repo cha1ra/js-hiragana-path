@@ -155,6 +155,10 @@
     let maxDistance = 30;        // マーカーとマウスの許容最大距離
     let markerRadius = 30;       // マーカーの半径
     let strokeCompleted = false; // 現在のストロークが完了したか
+    let isAnimating = false;     // アニメーション実行中フラグ
+    let animationProgress = 0;   // アニメーションの進行度（0〜1）
+    let animationSpeed = 0.01;   // アニメーションの速度（半分に遅く）
+    let repeatAnimation = true;  // アニメーションを繰り返すフラグ
 
     function setup() {
       const size = Math.min(windowWidth, 600);
@@ -190,6 +194,9 @@
           markerPosition = processedPathsData[currentPathIndex][currentStrokeIndex][markerIndex];
         }
         
+        // 最初のストロークのアニメーションを開始
+        startStrokeAnimation();
+        
         background(255);
         drawGuidelines();
         drawSVGPath();
@@ -202,8 +209,100 @@
       currentStrokeIndex = 0;
       markerIndex = 0;
       strokeCompleted = false;
+      isAnimating = false;
+      animationProgress = 0;
       background(240);
+      drawGuidelines();
       drawSVGPath();
+    }
+    
+    function startStrokeAnimation() {
+      // アニメーションをリセットして開始
+      isAnimating = true;
+      animationProgress = 0;
+    }
+    
+    function drawStrokeAnimation() {
+      if (!isAnimating || !processedPathsData[currentPathIndex] || !processedPathsData[currentPathIndex][currentStrokeIndex]) return;
+      
+      const strokePath = processedPathsData[currentPathIndex][currentStrokeIndex];
+      const pathLength = strokePath.length;
+      
+      if (pathLength < 2) return;
+      
+      // 現在のアニメーション位置を計算
+      const progressIndex = Math.min(Math.floor(animationProgress * (pathLength - 1)), pathLength - 1);
+      
+      // アニメーションの光の軌跡を描画（より輝くように修正）
+      drawingContext.shadowBlur = 20;
+      drawingContext.shadowColor = 'rgba(255, 255, 150, 0.8)';
+      noFill();
+      
+      // グラデーション効果のある軌跡（尾を引く光の表現）
+      let trailLength = Math.min(100, progressIndex); // 軌跡の長さをさらに長く
+      
+      for (let i = 0; i < trailLength; i++) {
+        let idx = progressIndex - i;
+        if (idx < 0) break;
+        
+        // 位置に応じた透明度（先頭が明るく、尾が暗い）
+        let alpha = map(i, 0, trailLength, 250, 0);
+        
+        // 光の色をより明るく鮮やかに
+        if (i < 5) {
+          stroke(255, 255, 255, alpha); // 先端は白色
+        } else {
+          // 尾の部分は黄色からオレンジに変化
+          let r = map(i, 5, trailLength, 255, 255);
+          let g = map(i, 5, trailLength, 255, 150);
+          let b = map(i, 5, trailLength, 150, 0);
+          stroke(r, g, b, alpha);
+        }
+        
+        // 光の大きさも位置に応じて変える（先端をより太く）
+        let size = map(i, 0, trailLength, 20, 2);
+        strokeWeight(size);
+        
+        if (idx > 0) {
+          line(strokePath[idx-1].x, strokePath[idx-1].y, strokePath[idx].x, strokePath[idx].y);
+        }
+      }
+      
+      // 光の先端に輝きを追加（より明るく）
+      drawingContext.shadowBlur = 30;
+      drawingContext.shadowColor = 'rgba(255, 255, 200, 1)';
+      fill(255, 255, 200, 230);
+      noStroke();
+      let currentPos = strokePath[progressIndex];
+      ellipse(currentPos.x, currentPos.y, 24, 24);
+      
+      // 内側の明るい部分（より輝くコア部分）
+      fill(255, 255, 255, 250);
+      drawingContext.shadowBlur = 40;
+      ellipse(currentPos.x, currentPos.y, 12, 12);
+      
+      // パルス効果（光が鼓動するように）
+      let pulseSize = 35 + sin(frameCount * 0.2) * 5;
+      drawingContext.shadowBlur = 25;
+      drawingContext.shadowColor = 'rgba(255, 255, 150, 0.3)';
+      fill(255, 255, 150, 30);
+      ellipse(currentPos.x, currentPos.y, pulseSize, pulseSize);
+      
+      // シャドウブラーをリセット
+      drawingContext.shadowBlur = 0;
+      
+      // アニメーションの進行
+      animationProgress += animationSpeed;
+      
+      // アニメーション完了時の処理
+      if (animationProgress >= 1) {
+        if (repeatAnimation) {
+          // なぞっている途中でもアニメーションを繰り返す
+          animationProgress = 0;
+        } else {
+          isAnimating = false;
+        }
+      }
     }
     
     function drawGuidelines() {
@@ -224,6 +323,9 @@
         drawGuidelines();
         drawUserPaths();
         drawSVGPath();
+        
+        // ストロークアニメーションを描画
+        drawStrokeAnimation();
         
         if (isDragging && markerPosition) {
           // ドラッグ中の処理
@@ -255,6 +357,9 @@
               // 次のストロークの最初のマーカー位置をセット
               markerPosition = processedPathsData[currentPathIndex][currentStrokeIndex][markerIndex];
               isDragging = false; // 次のストロークを始めるには再度クリックが必要
+              
+              // 次のストロークのアニメーションを開始
+              startStrokeAnimation();
             } else {
               // 同じストローク内の次のマーカー位置をセット
               markerPosition = processedPathsData[currentPathIndex][currentStrokeIndex][markerIndex];
@@ -352,6 +457,8 @@
     function completeCharacter() {
       // 文字の完了処理
       let strokeCount = processedPathsData[currentPathIndex].length;
+      
+      // 成功メッセージの表示などをここに追加できます
       
       // ゲームをリセット
       resetGame();
