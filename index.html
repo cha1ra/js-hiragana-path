@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ひらがななぞりゲーム</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <!-- tailwind css -->
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <style>
     body {
       margin: 0;
@@ -17,7 +19,7 @@
     #game-container {
       position: relative;
       width: 600px;
-      height: 400px;
+      height: 600px;
       border: 1px solid #ccc;
       margin-bottom: 20px;
     }
@@ -97,7 +99,7 @@
     const svgNS = "http://www.w3.org/2000/svg";
     let tempSvg = document.createElementNS(svgNS, "svg");
     tempSvg.setAttribute("width", "600");
-    tempSvg.setAttribute("height", "400");
+    tempSvg.setAttribute("height", "600");
     document.body.appendChild(tempSvg);
     
     // パスをサンプリングして点の配列に変換する関数
@@ -137,7 +139,7 @@
 
     let currentPathIndex = 0;    // 現在選択されている文字のインデックス
     let currentStrokeIndex = 0;  // 現在のストロークインデックス
-    let userPath = [];           // ユーザーがなぞったパスのポイント配列
+    let userPaths = [];           // ユーザーがなぞったパス（複数ストローク対応）
     let markerPosition;          // マーカーの現在位置
     let markerIndex = 0;         // 現在のマーカーインデックス
     let gameStarted = false;     // ゲーム開始フラグ
@@ -147,7 +149,7 @@
     let strokeCompleted = false; // 現在のストロークが完了したか
 
     function setup() {
-      const canvas = createCanvas(600, 400);
+      const canvas = createCanvas(600, 600);
       canvas.parent('game-container');
       
       // 文字選択のイベントリスナー
@@ -168,7 +170,7 @@
     function startGame() {
       if (!gameStarted) {
         gameStarted = true;
-        userPath = [];
+        userPaths = [[]];  // 最初のストローク用の空配列
         currentStrokeIndex = 0;
         markerIndex = 0;
         strokeCompleted = false;
@@ -185,7 +187,7 @@
     
     function resetGame() {
       gameStarted = false;
-      userPath = [];
+      userPaths = [[]];
       currentStrokeIndex = 0;
       markerIndex = 0;
       strokeCompleted = false;
@@ -196,7 +198,7 @@
     function draw() {
       if (gameStarted) {
         background(240);
-        drawUserPath();
+        drawUserPaths();
         drawSVGPath();
         
         if (isDragging && markerPosition) {
@@ -207,7 +209,7 @@
           // マウスがマーカーに近い場合、次のポイントに進む
           if (d < maxDistance) {
             // ポイントを記録
-            userPath.push({x: markerPosition.x, y: markerPosition.y});
+            userPaths[currentStrokeIndex].push({x: markerPosition.x, y: markerPosition.y});
             
             // 次のマーカーに進む
             markerIndex++;
@@ -223,6 +225,9 @@
                 completeCharacter();
                 return;
               }
+              
+              // 次のストローク用の空配列を追加
+              userPaths.push([]);
               
               // 次のストロークの最初のマーカー位置をセット
               markerPosition = processedPathsData[currentPathIndex][currentStrokeIndex][markerIndex];
@@ -276,16 +281,20 @@
       }
     }
     
-    function drawUserPath() {
-      // ユーザーの線を描画
-      if (userPath.length > 1) {
-        stroke(0, 0, 255);
-        strokeWeight(8);
-        beginShape();
-        for (let pt of userPath) {
-          vertex(pt.x, pt.y);
+    function drawUserPaths() {
+      // ユーザーの線を描画（複数ストローク対応）
+      for (let i = 0; i < userPaths.length; i++) {
+        let path = userPaths[i];
+        if (path.length > 1) {
+          stroke(0, 0, 255);
+          strokeWeight(8);
+          noFill();
+          beginShape();
+          for (let pt of path) {
+            vertex(pt.x, pt.y);
+          }
+          endShape();
         }
-        endShape();
       }
     }
     
@@ -306,7 +315,7 @@
           if (d < markerRadius * 1.5) {
             isDragging = true;
             // 新しいストローク開始時は、ストロークの最初のポイントを追加
-            userPath.push({x: markerPosition.x, y: markerPosition.y});
+            userPaths[currentStrokeIndex].push({x: markerPosition.x, y: markerPosition.y});
           }
         }
       }
