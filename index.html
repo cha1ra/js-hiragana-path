@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ひらがななぞりゲーム</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      font-family: Arial, sans-serif;
+    }
+    #game-container {
+      position: relative;
+      width: 600px;
+      height: 400px;
+      border: 1px solid #ccc;
+      margin-bottom: 20px;
+    }
+    .button {
+      padding: 10px 20px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 5px;
+    }
+    .button:hover {
+      background-color: #45a049;
+    }
+    #path-select {
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>ひらがななぞりゲーム</h1>
+  <div id="path-select">
+    <label for="character-select">文字を選択：</label>
+    <select id="character-select" class="button">
+      <option value="0">あ</option>
+      <option value="1">い</option>
+      <option value="2">う</option>
+    </select>
+  </div>
+  <div id="game-container"></div>
+  <div>
+    <button class="button" id="start-button">スタート</button>
+    <button class="button" id="reset-button">リセット</button>
+  </div>
+
+  <script>
+    // SVGパスデータを保持する配列
+    const svgPathsData = [
+      // 「あ」のストローク（2画）
+      [
+        // 1画目 - SVGパス形式
+        {
+          pathData: "M100,100 C150,150 200,180 250,200 S350,150 400,100",
+          samplePoints: 60  // サンプリングする点の数
+        },
+        // 2画目
+        {
+          pathData: "M180,220 Q260,280 340,350",
+          samplePoints: 60
+        }
+      ],
+      // 「い」のストローク（1画）
+      [
+        // 1画目
+        {
+          pathData: "M150,60 Q250,180 350,320",
+          samplePoints: 60
+        }
+      ],
+      // 「う」のストローク（2画）
+      [
+        // 1画目
+        {
+          pathData: "M150,150 C200,140 250,150 300,180 S350,240 380,300",
+          samplePoints: 60
+        },
+        // 2画目
+        {
+          pathData: "M170,220 Q250,260 370,220",
+          samplePoints: 60
+        }
+      ]
+    ];
+    
+    // SVGパスをポイントに変換するための一時的なSVG要素
+    const svgNS = "http://www.w3.org/2000/svg";
+    let tempSvg = document.createElementNS(svgNS, "svg");
+    tempSvg.setAttribute("width", "600");
+    tempSvg.setAttribute("height", "400");
+    document.body.appendChild(tempSvg);
+    
+    // パスをサンプリングして点の配列に変換する関数
+    function samplePathToPoints(pathData, numPoints) {
+      // 一時パス要素を作成
+      let path = document.createElementNS(svgNS, "path");
+      path.setAttribute("d", pathData);
+      tempSvg.appendChild(path);
+      
+      // パスの長さを取得
+      const pathLength = path.getTotalLength();
+      
+      // サンプリング
+      let points = [];
+      for (let i = 0; i < numPoints; i++) {
+        let distance = (i / (numPoints - 1)) * pathLength;
+        let point = path.getPointAtLength(distance);
+        points.push({x: point.x, y: point.y});
+      }
+      
+      // 一時要素を削除
+      tempSvg.removeChild(path);
+      
+      return points;
+    }
+    
+    // SVGパスデータをポイント配列に変換
+    const processedPathsData = svgPathsData.map(character => {
+      return character.map(stroke => {
+        return samplePathToPoints(stroke.pathData, stroke.samplePoints);
+      });
+    });
+    console.log('SVGパスデータをポイント配列に変換', processedPathsData);
+    
+    // 一時SVG要素を削除
+    document.body.removeChild(tempSvg);
+
+    let currentPathIndex = 0;    // 現在選択されている文字のインデックス
+    let currentStrokeIndex = 0;  // 現在のストロークインデックス
+    let userPath = [];           // ユーザーがなぞったパスのポイント配列
+    let markerPosition;          // マーカーの現在位置
+    let markerIndex = 0;         // 現在のマーカーインデックス
+    let gameStarted = false;     // ゲーム開始フラグ
+    let isDragging = false;      // ドラッグ中フラグ
+    let maxDistance = 30;        // マーカーとマウスの許容最大距離
+    let markerRadius = 30;       // マーカーの半径
+    let strokeCompleted = false; // 現在のストロークが完了したか
+
+    function setup() {
+      const canvas = createCanvas(600, 400);
+      canvas.parent('game-container');
+      
+      // 文字選択のイベントリスナー
+      document.getElementById('character-select').addEventListener('change', function() {
+        currentPathIndex = parseInt(this.value);
+        resetGame();
+      });
+      
+      // ボタンのイベントリスナー
+      document.getElementById('start-button').addEventListener('click', startGame);
+      document.getElementById('reset-button').addEventListener('click', resetGame);
+      
+      // 最初の描画
+      background(240);
+      drawSVGPath();
+    }
+    
+    function startGame() {
+      if (!gameStarted) {
+        gameStarted = true;
+        userPath = [];
+        currentStrokeIndex = 0;
+        markerIndex = 0;
+        strokeCompleted = false;
+        
+        // 最初のマーカー位置を設定
+        if (processedPathsData[currentPathIndex] && processedPathsData[currentPathIndex][currentStrokeIndex]) {
+          markerPosition = processedPathsData[currentPathIndex][currentStrokeIndex][markerIndex];
+        }
+        
+        background(240);
+        drawSVGPath();
+      }
+    }
+    
+    function resetGame() {
+      gameStarted = false;
+      userPath = [];
+      currentStrokeIndex = 0;
+      markerIndex = 0;
+      strokeCompleted = false;
+      background(240);
+      drawSVGPath();
+    }
+    
+    function draw() {
+      if (gameStarted) {
+        background(240);
+        drawUserPath();
+        drawSVGPath();
+        
+        if (isDragging && markerPosition) {
+          // ドラッグ中の処理
+          let d = dist(mouseX, mouseY, markerPosition.x, markerPosition.y);
+          console.log('ドラッグ中の距離', d);
+          
+          // マウスがマーカーに近い場合、次のポイントに進む
+          if (d < maxDistance) {
+            // ポイントを記録
+            userPath.push({x: markerPosition.x, y: markerPosition.y});
+            
+            // 次のマーカーに進む
+            markerIndex++;
+            
+            // このストロークの最後に到達したかチェック
+            if (markerIndex >= processedPathsData[currentPathIndex][currentStrokeIndex].length) {
+              strokeCompleted = true;
+              currentStrokeIndex++;
+              markerIndex = 0;
+              
+              // すべてのストロークが完了したかチェック
+              if (currentStrokeIndex >= processedPathsData[currentPathIndex].length) {
+                completeCharacter();
+                return;
+              }
+              
+              // 次のストロークの最初のマーカー位置をセット
+              markerPosition = processedPathsData[currentPathIndex][currentStrokeIndex][markerIndex];
+              isDragging = false; // 次のストロークを始めるには再度クリックが必要
+            } else {
+              // 同じストローク内の次のマーカー位置をセット
+              markerPosition = processedPathsData[currentPathIndex][currentStrokeIndex][markerIndex];
+            }
+          }
+        }
+      }
+    }
+    
+    function drawSVGPath() {
+      // 現在選択されているSVGパスを描画
+      if (!processedPathsData[currentPathIndex]) return;
+      
+      // すべてのストロークを描画
+      for (let s = 0; s < processedPathsData[currentPathIndex].length; s++) {
+        let strokePath = processedPathsData[currentPathIndex][s];
+        
+        // ストロークの線を描画（SVG形式のパスを描画）
+        stroke(200, 200, 200, 150); // より薄いグレー
+        strokeWeight(16);
+        noFill();
+        beginShape();
+        for (let pt of strokePath) {
+          vertex(pt.x, pt.y);
+        }
+        endShape();
+        
+        // 現在のストロークのマーカーのみ描画
+        if (s === currentStrokeIndex) {
+          for (let i = 0; i < strokePath.length; i++) {
+            let pt = strokePath[i];
+            
+            // 完了したポイントは表示しない
+            if (i === markerIndex) {
+              // 現在のマーカーポイントのみ赤色で表示
+              fill(200, 0, 0, 150);
+              noStroke();
+              ellipse(pt.x, pt.y, markerRadius * 2, markerRadius * 2);
+            }
+          }
+        }
+        
+        // ストロークの順序を表示
+        fill(0);
+        textSize(16);
+        text((s + 1).toString(), strokePath[0].x - 20, strokePath[0].y - 10);
+      }
+    }
+    
+    function drawUserPath() {
+      // ユーザーの線を描画
+      if (userPath.length > 1) {
+        stroke(0, 0, 255);
+        strokeWeight(8);
+        beginShape();
+        for (let pt of userPath) {
+          vertex(pt.x, pt.y);
+        }
+        endShape();
+      }
+    }
+    
+    function drawMarker() {
+      // 現在のマーカーを描画
+      if (gameStarted && markerPosition) {
+        fill(255, 0, 0, 150);
+        noStroke();
+        ellipse(markerPosition.x, markerPosition.y, markerRadius * 2, markerRadius * 2);
+      }
+    }
+    
+    function mousePressed() {
+      if (gameStarted && mouseX >= 0 && mouseX <= width && mouseY >= 0 && mouseY <= height) {
+        // マーカーの近くでクリックされたかチェック
+        if (markerPosition) {
+          let d = dist(mouseX, mouseY, markerPosition.x, markerPosition.y);
+          if (d < markerRadius * 1.5) {
+            isDragging = true;
+            // 新しいストローク開始時は、ストロークの最初のポイントを追加
+            userPath.push({x: markerPosition.x, y: markerPosition.y});
+          }
+        }
+      }
+    }
+    
+    function mouseDragged() {
+      // ドラッグ処理はdraw関数内で行う
+    }
+    
+    function mouseReleased() {
+      isDragging = false;
+      
+      // ストロークが完了していない場合は現在の位置を維持
+      if (gameStarted && !strokeCompleted) {
+        // マーカー位置はリセットせず、現在の位置を維持
+        strokeCompleted = false;
+      }
+    }
+    
+    function completeCharacter() {
+      // 文字の完了処理
+      let strokeCount = processedPathsData[currentPathIndex].length;
+      
+      // 完了メッセージとスコア
+      alert(`「${document.getElementById('character-select').options[currentPathIndex].text}」の書き取りが完了しました！\nスコア: ${finalScore}%`);
+      
+      // ゲームをリセット
+      resetGame();
+    }
+    
+  </script>
+</body>
+</html>
