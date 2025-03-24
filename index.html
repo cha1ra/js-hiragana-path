@@ -286,7 +286,7 @@
       for (let i = 0; i < userPaths.length; i++) {
         let path = userPaths[i];
         if (path.length > 1) {
-          stroke(0, 0, 255);
+          stroke(0, 207, 250);
           strokeWeight(8);
           noFill();
           beginShape();
@@ -295,15 +295,6 @@
           }
           endShape();
         }
-      }
-    }
-    
-    function drawMarker() {
-      // 現在のマーカーを描画
-      if (gameStarted && markerPosition) {
-        fill(255, 0, 0, 150);
-        noStroke();
-        ellipse(markerPosition.x, markerPosition.y, markerRadius * 2, markerRadius * 2);
       }
     }
     
