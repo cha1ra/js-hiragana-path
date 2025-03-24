@@ -65,17 +65,14 @@
         // 1画目 - SVGパス形式
         {
           pathData: "M 68,93 C 134,94 201,80 233,73",
-          samplePoints: 60  // サンプリングする点の数
         },
         // 2画目
         {
           pathData: "m 148,30 c -16,95 -12,202 4,257",
-          samplePoints: 60
         },
         // 3画目
         {
           pathData: "M 202,124 C 186,199 126.5329,294.64235 85,284 42.077297,273.00153 50.913695,215.5525 79,187 c 22.89599,-23.27603 97,-67 166,-28 69,39 24,126 -51,138",
-          samplePoints: 60
         }
       ],
       // 「い」のストローク（1画）
@@ -83,7 +80,6 @@
         // 1画目
         {
           pathData: "M150,60 Q250,180 350,320",
-          samplePoints: 60
         }
       ],
       // 「う」のストローク（2画）
@@ -91,12 +87,10 @@
         // 1画目
         {
           pathData: "M150,150 C200,140 250,150 300,180 S350,240 380,300",
-          samplePoints: 60
         },
         // 2画目
         {
           pathData: "M170,220 Q250,260 370,220",
-          samplePoints: 60
         }
       ]
     ];
@@ -108,8 +102,8 @@
     tempSvg.setAttribute("height", "600");
     document.body.appendChild(tempSvg);
     
-    // パスをサンプリングして点の配列に変換する関数
-    function samplePathToPoints(pathData, numPoints) {
+    // 一定距離ごとにパスをサンプリングして点の配列に変換する関数
+    function samplePathToPoints(pathData, pointDistance = 10) {
       // 一時パス要素を作成
       let path = document.createElementNS(svgNS, "path");
       path.setAttribute("d", pathData);
@@ -117,6 +111,9 @@
       
       // パスの長さを取得
       const pathLength = path.getTotalLength();
+      
+      // 一定の距離でサンプリングするポイント数を計算
+      const numPoints = Math.max(Math.ceil(pathLength / pointDistance), 2);
       
       // サンプリング
       let points = [];
@@ -129,15 +126,20 @@
       // 一時要素を削除
       tempSvg.removeChild(path);
       
+      console.log(`Path length: ${pathLength.toFixed(2)}px, Points: ${numPoints}`);
       return points;
     }
+
+        // 定数: マーカー間の距離（ピクセル単位）
+    const POINT_DISTANCE = 10; // 10ピクセルごとにマーカーを配置
     
     // SVGパスデータをポイント配列に変換
     const processedPathsData = svgPathsData.map(character => {
       return character.map(stroke => {
-        return samplePathToPoints(stroke.pathData, stroke.samplePoints);
+        return samplePathToPoints(stroke.pathData, POINT_DISTANCE);
       });
     });
+
     console.log('SVGパスデータをポイント配列に変換', processedPathsData);
     
     // 一時SVG要素を削除
@@ -170,7 +172,8 @@
       document.getElementById('reset-button').addEventListener('click', resetGame);
       
       // 最初の描画
-      background(240);
+      background(255);
+      drawGuidelines();
       drawSVGPath();
     }
     
@@ -187,7 +190,8 @@
           markerPosition = processedPathsData[currentPathIndex][currentStrokeIndex][markerIndex];
         }
         
-        background(240);
+        background(255);
+        drawGuidelines();
         drawSVGPath();
       }
     }
@@ -202,16 +206,28 @@
       drawSVGPath();
     }
     
+    function drawGuidelines() {
+      // 十字の点線を描画
+      stroke(200, 200, 200, 150);
+      strokeWeight(3);
+      drawingContext.setLineDash([10, 10]); // 点線のパターンを設定
+      line(width / 2, 0, width / 2, height);
+      line(0, height / 2, width, height / 2);
+      drawingContext.setLineDash([]); // 点線をリセット
+    }
+    
     function draw() {
+      
+      
       if (gameStarted) {
-        background(240);
+        background(255);
+        drawGuidelines();
         drawUserPaths();
         drawSVGPath();
         
         if (isDragging && markerPosition) {
           // ドラッグ中の処理
           let d = dist(mouseX, mouseY, markerPosition.x, markerPosition.y);
-          console.log('ドラッグ中の距離', d);
           
           // マウスがマーカーに近い場合、次のポイントに進む
           if (d < maxDistance) {
@@ -336,9 +352,6 @@
     function completeCharacter() {
       // 文字の完了処理
       let strokeCount = processedPathsData[currentPathIndex].length;
-      
-      // 完了メッセージとスコア
-      alert(`「${document.getElementById('character-select').options[currentPathIndex].text}」の書き取りが完了しました！\nスコア: ${finalScore}%`);
       
       // ゲームをリセット
       resetGame();
